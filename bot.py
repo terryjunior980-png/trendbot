@@ -2,17 +2,18 @@ import discord
 from discord.ext import commands, tasks
 import requests
 from bs4 import BeautifulSoup
-import anthropic
+from groq import Groq
 import json
 import asyncio
 from datetime import datetime
+import os
 
 # ========================
-# CONFIG — FILL THESE IN
+# CONFIG
 # ========================
-DISCORD_TOKEN = "MTUwOTE3MTIwNTA4Mzc1ODY2NA.GdmnqZ.HEMSX-4JGCY38ebMN1lOKsbMMnYXhh5r6l6SYM"
-CHANNEL_ID = 1509172843265396903  # Your Discord channel ID
-ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY"
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+CHANNEL_ID = 1509172843265396903
 
 # ========================
 # BOT SETUP
@@ -20,7 +21,7 @@ ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY"
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-client_ai = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client_ai = Groq(api_key=GROQ_API_KEY)
 
 # ========================
 # TRENDING PRODUCT FINDER
@@ -28,7 +29,6 @@ client_ai = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 def get_trending_products():
     products = []
 
-    # Source 1: AliExpress Hot Products
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         url = "https://www.aliexpress.com/popular.html"
@@ -44,27 +44,15 @@ def get_trending_products():
     except Exception as e:
         print(f"AliExpress error: {e}")
 
-    # Source 2: CJ Dropshipping trending (free API)
-    try:
-        cj_url = "https://developers.cjdropshipping.com/api2.0/v1/product/list"
-        params = {
-            "pageNum": 1,
-            "pageSize": 5,
-            "orderBy": "hotSale"
-        }
-        res = requests.get(cj_url, params=params, timeout=10)
-        data = res.json()
-        if data.get("result"):
-            for item in data["result"].get("list", []):
-                products.append({
-                    "name": item.get("productNameEn"),
-                    "source": "CJ Dropshipping",
-                    "link": f"https://cjdropshipping.com/product/{item.get('pid')}",
-                    "price": item.get("sellPrice"),
-                    "supplier_id": item.get("pid")
-                })
-    except Exception as e:
-        print(f"CJ error: {e}")
+    # Fallback hardcoded trending categories if scraping fails
+    if not products:
+        products = [
+            {"name": "LED Strip Lights", "source": "Fallback", "link": "https://www.aliexpress.com/wholesale?SearchText=LED+strip+lights"},
+            {"name": "Portable Blender", "source": "Fallback", "link": "https://www.aliexpress.com/wholesale?SearchText=portable+blender"},
+            {"name": "Phone Stand Holder", "source": "Fallback", "link": "https://www.aliexpress.com/wholesale?SearchText=phone+stand+holder"},
+            {"name": "Magnetic Phone Case", "source": "Fallback", "link": "https://www.aliexpress.com/wholesale?SearchText=magnetic+phone+case"},
+            {"name": "Mini Projector", "source": "Fallback", "link": "https://www.aliexpress.com/wholesale?SearchText=mini+projector"},
+        ]
 
     return products
 
@@ -78,7 +66,7 @@ You are a viral social media marketing expert for dropshipping.
 
 Product: {product_name}
 
-Generate the following in JSON format only, no extra text:
+Generate the following in JSON format only, no extra text, no markdown:
 {{
   "tiktok_caption": "...",
   "youtube_description": "...",
@@ -89,13 +77,12 @@ Generate the following in JSON format only, no extra text:
   "profit_margin_estimate": "..."
 }}
 """
-    response = client_ai.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}]
+    response = client_ai.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000
     )
-    text = response.content[0].text
-    # Clean JSON
+    text = response.choices[0].message.content
     text = text.replace("```json", "").replace("```", "").strip()
     return json.loads(text)
 
@@ -104,33 +91,20 @@ Generate the following in JSON format only, no extra text:
 # FIND MULTIPLE SUPPLIERS
 # ========================
 def find_suppliers(product_name):
-    suppliers = []
-
-    # CJ Dropshipping
-    try:
-        url = "https://developers.cjdropshipping.com/api2.0/v1/product/list"
-        params = {"pageNum": 1, "pageSize": 3, "productName": product_name}
-        res = requests.get(url, params=params, timeout=10)
-        data = res.json()
-        if data.get("result"):
-            for item in data["result"].get("list", []):
-                suppliers.append({
-                    "platform": "CJ Dropshipping",
-                    "product": item.get("productNameEn"),
-                    "price": item.get("sellPrice"),
-                    "link": f"https://cjdropshipping.com/product/{item.get('pid')}",
-                    "supplier_id": item.get("pid")
-                })
-    except Exception as e:
-        print(f"Supplier search error: {e}")
-
-    # AliExpress search link (manual backup)
-    suppliers.append({
-        "platform": "AliExpress (manual)",
-        "link": f"https://www.aliexpress.com/wholesale?SearchText={product_name.replace(' ', '+')}",
-        "note": "Search and pick top seller"
-    })
-
+    suppliers = [
+        {
+            "platform": "AliExpress",
+            "link": f"https://www.aliexpress.com/wholesale?SearchText={product_name.replace(' ', '+')}"
+        },
+        {
+            "platform": "CJ Dropshipping",
+            "link": f"https://cjdropshipping.com/search?q={product_name.replace(' ', '+')}"
+        },
+        {
+            "platform": "Zendrop",
+            "link": f"https://app.zendrop.com/search?query={product_name.replace(' ', '+')}"
+        }
+    ]
     return suppliers
 
 
@@ -139,12 +113,8 @@ def find_suppliers(product_name):
 # ========================
 @bot.command(name="fulfill")
 async def fulfill_order(ctx, *, args):
-    """
-    Usage: !fulfill product="LED Strip Lights" orders=5 name="John Doe" address="123 Main St, NY" email="john@email.com"
-    """
     await ctx.send("⚙️ Processing fulfillment request...")
 
-    # Parse args
     try:
         parts = {}
         for part in args.split('" '):
@@ -159,7 +129,7 @@ async def fulfill_order(ctx, *, args):
         email = parts.get("email", "N/A")
 
         embed = discord.Embed(
-            title="📦 ORDER FULFILLMENT SENT",
+            title="📦 ORDER FULFILLMENT",
             color=0x00ff88,
             timestamp=datetime.now()
         )
@@ -169,22 +139,21 @@ async def fulfill_order(ctx, *, args):
         embed.add_field(name="Delivery Address", value=address, inline=False)
         embed.add_field(name="Email", value=email, inline=True)
         embed.add_field(
-            name="Supplier Action",
-            value="✅ Order details ready to forward to CJ Dropshipping",
+            name="Next Step",
+            value="✅ Go to CJ Dropshipping dashboard and place order with these details",
             inline=False
         )
-        embed.set_footer(text="Forward this to your CJ Dropshipping dashboard manually or via API")
 
         await ctx.send(embed=embed)
 
     except Exception as e:
-        await ctx.send(f"❌ Error parsing fulfillment: {e}\n\nFormat: `!fulfill product=\"name\" orders=5 name=\"Customer\" address=\"Address\" email=\"email\"`")
+        await ctx.send(f"❌ Error: {e}")
 
 
 # ========================
 # DAILY TRENDING ALERT TASK
 # ========================
-@tasks.loop(hours=6)  # Runs every 6 hours
+@tasks.loop(hours=6)
 async def send_trending_products():
     channel = bot.get_channel(CHANNEL_ID)
     if not channel:
@@ -195,11 +164,7 @@ async def send_trending_products():
 
     products = get_trending_products()
 
-    if not products:
-        await channel.send("⚠️ Couldn't fetch trending products right now. Retrying in 6 hours.")
-        return
-
-    for product in products[:3]:  # Send top 3
+    for product in products[:3]:
         try:
             marketing = generate_marketing_content(product["name"])
             suppliers = find_suppliers(product["name"])
@@ -209,33 +174,29 @@ async def send_trending_products():
                 color=0xff4500,
                 timestamp=datetime.now()
             )
-            embed.add_field(name="Source", value=product["source"], inline=True)
-            embed.add_field(name="Why Trending", value=marketing.get("why_trending", "N/A"), inline=False)
-            embed.add_field(name="Suggested Price", value=marketing.get("suggested_price", "N/A"), inline=True)
-            embed.add_field(name="Profit Margin", value=marketing.get("profit_margin_estimate", "N/A"), inline=True)
-
-            # Captions
+            embed.add_field(name="🌍 Source", value=product["source"], inline=True)
+            embed.add_field(name="💡 Why Trending", value=marketing.get("why_trending", "N/A"), inline=False)
+            embed.add_field(name="💰 Suggested Price", value=marketing.get("suggested_price", "N/A"), inline=True)
+            embed.add_field(name="📈 Profit Margin", value=marketing.get("profit_margin_estimate", "N/A"), inline=True)
             embed.add_field(name="🎵 TikTok Caption", value=marketing.get("tiktok_caption", "N/A"), inline=False)
             embed.add_field(name="🐦 Twitter Caption", value=marketing.get("twitter_caption", "N/A"), inline=False)
 
-            # Hashtags
             hashtags = " ".join(marketing.get("hashtags", []))
             embed.add_field(name="📌 Hashtags", value=hashtags, inline=False)
 
-            # Suppliers
             supplier_text = ""
-            for s in suppliers[:3]:
-                supplier_text += f"**{s['platform']}** — {s.get('link', 'N/A')}\n"
+            for s in suppliers:
+                supplier_text += f"**{s['platform']}** — {s['link']}\n"
             embed.add_field(name="🏭 Suppliers", value=supplier_text, inline=False)
 
             embed.add_field(
-                name="📦 To Fulfill Orders",
+                name="📦 Fulfill Orders",
                 value='`!fulfill product="PRODUCT NAME" orders=5 name="Customer" address="Address" email="email@email.com"`',
                 inline=False
             )
 
             await channel.send(embed=embed)
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
 
         except Exception as e:
             await channel.send(f"⚠️ Error processing {product['name']}: {e}")
@@ -251,7 +212,7 @@ async def on_ready():
 
 
 # ========================
-# MANUAL TRIGGER COMMAND
+# MANUAL TRIGGER
 # ========================
 @bot.command(name="scan")
 async def manual_scan(ctx):
