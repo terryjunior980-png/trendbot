@@ -1,0 +1,210 @@
+cat > index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrendDrop Store</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; }
+  header { background: linear-gradient(135deg, #ff4500, #ff8c00); padding: 20px; text-align: center; }
+  header h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; }
+  header p { font-size: 0.9rem; opacity: 0.9; margin-top: 5px; }
+  .hero { text-align: center; padding: 40px 20px; background: #111; }
+  .hero h2 { font-size: 1.8rem; color: #ff4500; }
+  .hero p { color: #aaa; margin-top: 10px; font-size: 1rem; }
+  .products { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 40px 20px; }
+  .card { background: #1a1a1a; border-radius: 16px; width: 300px; overflow: hidden; border: 1px solid #333; transition: transform 0.2s; }
+  .card:hover { transform: translateY(-5px); }
+  .card img { width: 100%; height: 200px; object-fit: cover; }
+  .card-body { padding: 20px; }
+  .card-body h3 { font-size: 1.1rem; color: #fff; }
+  .card-body p { color: #aaa; font-size: 0.85rem; margin-top: 8px; }
+  .price { font-size: 1.4rem; color: #ff4500; font-weight: 800; margin-top: 10px; }
+  .profit { font-size: 0.8rem; color: #00ff88; margin-top: 4px; }
+  .btn { display: block; background: linear-gradient(135deg, #ff4500, #ff8c00); color: #fff; text-align: center; padding: 14px; border-radius: 10px; margin-top: 15px; font-weight: 700; text-decoration: none; font-size: 1rem; cursor: pointer; border: none; width: 100%; }
+  .btn:hover { opacity: 0.9; }
+  .how { background: #111; padding: 40px 20px; text-align: center; }
+  .how h2 { font-size: 1.5rem; color: #ff4500; margin-bottom: 30px; }
+  .steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+  .step { background: #1a1a1a; border-radius: 12px; padding: 20px; width: 200px; border: 1px solid #333; }
+  .step .num { font-size: 2rem; color: #ff4500; font-weight: 800; }
+  .step p { color: #aaa; font-size: 0.85rem; margin-top: 8px; }
+  .payment { background: #0a0a0a; padding: 40px 20px; text-align: center; }
+  .payment h2 { font-size: 1.5rem; color: #ff4500; margin-bottom: 20px; }
+  .payment-icons { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+  .payment-icons span { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 10px 20px; color: #fff; font-size: 0.9rem; }
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999; justify-content: center; align-items: center; }
+  .modal.active { display: flex; }
+  .modal-box { background: #1a1a1a; border-radius: 16px; padding: 30px; width: 90%; max-width: 450px; border: 1px solid #333; }
+  .modal-box h3 { font-size: 1.3rem; color: #ff4500; margin-bottom: 20px; }
+  .modal-box input { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; font-size: 0.9rem; margin-bottom: 12px; }
+  .modal-box input::placeholder { color: #666; }
+  .close-btn { background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-right: 10px; }
+  footer { text-align: center; padding: 20px; color: #555; font-size: 0.8rem; background: #111; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔥 TRENDDROP</h1>
+  <p>Hottest products delivered straight to your door</p>
+</header>
+
+<div class="hero">
+  <h2>Trending Products. Unbeatable Prices.</h2>
+  <p>We find the hottest products so you don't have to. Fast shipping worldwide.</p>
+</div>
+
+<div class="products" id="products">
+
+  <div class="card">
+    <img src="https://ae01.alicdn.com/kf/S8d0d4a2e4e2f4a2a9c8e9c8e9c8e9c8eX.jpg" onerror="this.src='https://via.placeholder.com/300x200/1a1a1a/ff4500?text=LED+Strip+Lights'" alt="LED Strip Lights">
+    <div class="card-body">
+      <h3>LED Strip Lights</h3>
+      <p>Transform any room with vibrant LED lighting. Easy to install, energy efficient.</p>
+      <div class="price">$19.99</div>
+      <button class="btn" onclick="openOrder('LED Strip Lights', '$19.99')">🛒 Buy Now</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <img src="https://via.placeholder.com/300x200/1a1a1a/ff4500?text=Portable+Blender" alt="Portable Blender">
+    <div class="card-body">
+      <h3>Portable Blender</h3>
+      <p>Blend smoothies anywhere. USB rechargeable, compact and powerful.</p>
+      <div class="price">$25.99</div>
+      <button class="btn" onclick="openOrder('Portable Blender', '$25.99')">🛒 Buy Now</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <img src="https://via.placeholder.com/300x200/1a1a1a/ff4500?text=Mini+Projector" alt="Mini Projector">
+    <div class="card-body">
+      <h3>Mini Projector</h3>
+      <p>Watch movies anywhere. Compact projector with HD quality display.</p>
+      <div class="price">$49.99</div>
+      <button class="btn" onclick="openOrder('Mini Projector', '$49.99')">🛒 Buy Now</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <img src="https://via.placeholder.com/300x200/1a1a1a/ff4500?text=Wireless+Earbuds" alt="Wireless Earbuds">
+    <div class="card-body">
+      <h3>Wireless Earbuds</h3>
+      <p>Crystal clear sound with noise cancellation. Long battery life.</p>
+      <div class="price">$29.99</div>
+      <button class="btn" onclick="openOrder('Wireless Earbuds', '$29.99')">🛒 Buy Now</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <img src="https://via.placeholder.com/300x200/1a1a1a/ff4500?text=Smart+Watch" alt="Smart Watch">
+    <div class="card-body">
+      <h3>Smart Watch</h3>
+      <p>Track fitness, notifications and more. Stylish and affordable.</p>
+      <div class="price">$35.99</div>
+      <button class="btn" onclick="openOrder('Smart Watch', '$35.99')">🛒 Buy Now</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="how">
+  <h2>How It Works</h2>
+  <div class="steps">
+    <div class="step"><div class="num">1</div><p>Pick your product and click Buy Now</p></div>
+    <div class="step"><div class="num">2</div><p>Fill in your details and pay securely</p></div>
+    <div class="step"><div class="num">3</div><p>We process your order within 24 hours</p></div>
+    <div class="step"><div class="num">4</div><p>Receive tracking ID and get your product</p></div>
+  </div>
+</div>
+
+<div class="payment">
+  <h2>We Accept</h2>
+  <div class="payment-icons">
+    <span>🏦 Bank Transfer</span>
+    <span>₿ Crypto</span>
+    <span>💳 Flutterwave</span>
+    <span>📱 MiniPay</span>
+  </div>
+</div>
+
+<footer>
+  © 2026 TrendDrop. All rights reserved. Fast worldwide shipping.
+</footer>
+
+<!-- ORDER MODAL -->
+<div class="modal" id="orderModal">
+  <div class="modal-box">
+    <h3>🛒 Order: <span id="modalProduct"></span></h3>
+    <p style="color:#aaa; margin-bottom:15px; font-size:0.85rem;">Price: <span id="modalPrice" style="color:#ff4500; font-weight:800;"></span></p>
+    <input type="text" id="custName" placeholder="Full Name">
+    <input type="text" id="custAddress" placeholder="Street Address">
+    <input type="text" id="custCity" placeholder="City">
+    <input type="text" id="custProvince" placeholder="State / Province">
+    <input type="text" id="custZip" placeholder="ZIP / Postal Code">
+    <input type="text" id="custCountry" placeholder="Country (e.g. NG, US, UK)">
+    <input type="text" id="custPhone" placeholder="Phone Number">
+    <input type="email" id="custEmail" placeholder="Email Address">
+    <button class="btn" onclick="submitOrder()">💳 Proceed to Payment</button>
+    <button class="close-btn" onclick="closeOrder()" style="margin-top:10px; width:100%;">Cancel</button>
+  </div>
+</div>
+
+<script>
+let currentProduct = '';
+let currentPrice = '';
+
+function openOrder(product, price) {
+  currentProduct = product;
+  currentPrice = price;
+  document.getElementById('modalProduct').textContent = product;
+  document.getElementById('modalPrice').textContent = price;
+  document.getElementById('orderModal').classList.add('active');
+}
+
+function closeOrder() {
+  document.getElementById('orderModal').classList.remove('active');
+}
+
+async function submitOrder() {
+  const name = document.getElementById('custName').value;
+  const address = document.getElementById('custAddress').value;
+  const city = document.getElementById('custCity').value;
+  const province = document.getElementById('custProvince').value;
+  const zip = document.getElementById('custZip').value;
+  const country = document.getElementById('custCountry').value;
+  const phone = document.getElementById('custPhone').value;
+  const email = document.getElementById('custEmail').value;
+
+  if (!name || !address || !city || !zip || !country || !phone) {
+    alert('Please fill in all required fields.');
+    return;
+  }
+
+  // Send order to Discord webhook
+  const webhookUrl = 'DISCORD_WEBHOOK_URL';
+  const message = {
+    content: `🛒 **NEW ORDER**\n**Product:** ${currentProduct}\n**Price:** ${currentPrice}\n**Name:** ${name}\n**Address:** ${address}\n**City:** ${city}\n**Province:** ${province}\n**ZIP:** ${zip}\n**Country:** ${country}\n**Phone:** ${phone}\n**Email:** ${email}\n\n**Fulfill command:**\n\`!fulfill product=${currentProduct.replace(/ /g,'-')} orders=1 name=${name.replace(/ /g,'_')} address=${address.replace(/ /g,'_')} city=${city.replace(/ /g,'_')} province=${province} zip=${zip} country=${country} phone=${phone}\``
+  };
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(message)
+    });
+  } catch(e) {
+    console.log('Webhook error:', e);
+  }
+
+  // Redirect to Flutterwave payment
+  window.location.href = 'https://flutterwave.com/pay/ocoagewms2em';
+}
+</script>
+
+</body>
+</html>
+EOF
