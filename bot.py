@@ -14,13 +14,13 @@ DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 CJ_API_KEY = os.environ.get("CJ_API_KEY")
 CHANNEL_ID = 1509172843265396903
+DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK")
 FLUTTERWAVE_SECRET = os.environ.get("FLUTTERWAVE_SECRET", "")
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 client_ai = Groq(api_key=GROQ_API_KEY)
-
 app = Flask(__name__)
 
 # ========================
@@ -29,13 +29,11 @@ app = Flask(__name__)
 @app.route("/webhook", methods=["POST"])
 def flutterwave_webhook():
     data = request.json
-    print(f"Webhook received: {data}")
     try:
         if data.get("event") == "charge.completed" and data.get("data", {}).get("status") == "successful":
             payment = data["data"]
             customer = payment.get("customer", {})
             meta = payment.get("meta", {})
-
             name = customer.get("name", "Customer")
             email = customer.get("email", "")
             phone = customer.get("phone_number", "")
@@ -46,30 +44,26 @@ def flutterwave_webhook():
             province = meta.get("province", "")
             zip_code = meta.get("zip", "")
             country = meta.get("country", "NG")
-
-            # Send to Discord
-            webhook_url = os.environ.get("DISCORD_WEBHOOK")
-            if webhook_url:
+            if DISCORD_WEBHOOK:
                 message = {
                     "content": f"💰 **PAYMENT RECEIVED**\n**Product:** {product}\n**Amount:** ${amount}\n**Customer:** {name}\n**Email:** {email}\n**Phone:** {phone}\n**Address:** {address}, {city}, {province}, {zip_code}, {country}\n\n⚙️ Auto fulfilling order now..."
                 }
-                requests.post(webhook_url, json=message)
-
-            # Auto fulfill
+                requests.post(DISCORD_WEBHOOK, json=message)
             asyncio.run_coroutine_threadsafe(
                 auto_fulfill(product, name, address, city, province, zip_code, country, phone),
                 bot.loop
             )
-
     except Exception as e:
         print(f"Webhook error: {e}")
-
     return jsonify({"status": "ok"}), 200
 
 @app.route("/", methods=["GET"])
 def home():
-    return "TrendBot is running!", 200
+    return "TrendBot is running 24/7!", 200
 
+# ========================
+# AUTO FULFILL
+# ========================
 async def auto_fulfill(product_name, name, address, city, province, zip_code, country, phone):
     channel = bot.get_channel(CHANNEL_ID)
     try:
@@ -78,21 +72,17 @@ async def auto_fulfill(product_name, name, address, city, province, zip_code, co
             if channel:
                 await channel.send("❌ Auto fulfill failed: Could not connect to CJ.")
             return
-
         products = search_cj_product(product_name, token)
         if not products:
             if channel:
                 await channel.send(f"❌ Auto fulfill failed: No CJ product found for {product_name}")
             return
-
         pid = products[0].get("pid", "")
         vid = get_product_vid(pid, token)
-
         if not vid:
             if channel:
                 await channel.send(f"❌ Auto fulfill failed: No VID found for {product_name}")
             return
-
         customer = {
             "name": name,
             "address": address,
@@ -102,9 +92,7 @@ async def auto_fulfill(product_name, name, address, city, province, zip_code, co
             "country": country,
             "phone": phone
         }
-
         result = create_cj_order(token, vid, 1, customer)
-
         if result.get("result"):
             order_id = result["data"].get("orderId", "N/A")
             if channel:
@@ -118,7 +106,6 @@ async def auto_fulfill(product_name, name, address, city, province, zip_code, co
         else:
             if channel:
                 await channel.send(f"❌ Auto fulfill failed: {result.get('message', 'Unknown error')}")
-
     except Exception as e:
         if channel:
             await channel.send(f"❌ Auto fulfill error: {e}")
@@ -211,7 +198,6 @@ def get_trending_products():
             return products[:10]
     except Exception as e:
         print(f"CJ trending error: {e}")
-
     return [
         {"name": "LED Strip Lights", "source": "Trending", "image": "https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=400", "price": "8.99"},
         {"name": "Portable Blender", "source": "Trending", "image": "https://images.unsplash.com/photo-1502743780242-f10c78f797c7?w=400", "price": "12.99"},
@@ -236,7 +222,9 @@ Generate the following in JSON format only, no extra text, no markdown:
   "hashtags": ["...", "...", "...", "...", "...", "...", "...", "...", "...", "..."],
   "why_trending": "...",
   "suggested_price": "...",
-  "profit_margin_estimate": "..."
+  "profit_margin_estimate": "...",
+  "pika_prompt": "cinematic product video of {product_name} in action showing its benefits lifestyle setting satisfying modern aesthetic trending on social media",
+  "kling_prompt": "realistic product showcase of {product_name} close up shots natural lighting people using it happily lifestyle setting high quality"
 }}
 """
     response = client_ai.chat.completions.create(
@@ -274,7 +262,7 @@ def update_store_page(products):
         new_html = html[:start] + cards + html[end:]
         with open("index.html", "w") as f:
             f.write(new_html)
-        os.system('git add index.html && git commit -m "update store products" && git push')
+        os.system('git config --global user.email "trendbot@render.com" && git config --global user.name "TrendBot" && git add index.html && git commit -m "update store products" && git push')
         print("Store updated with new products")
     except Exception as e:
         print(f"Store update error: {e}")
@@ -321,7 +309,6 @@ async def fulfill_order(ctx, *, args):
         pattern = r'(\w+)=([^\s]+)'
         matches = re.findall(pattern, args)
         parts = {k.strip(): v.strip().replace("_", " ") for k, v in matches}
-
         product_name = parts.get("product", "").replace("-", " ")
         quantity = int(parts.get("orders", "1"))
         vid = parts.get("vid", "")
@@ -334,12 +321,10 @@ async def fulfill_order(ctx, *, args):
             "country": parts.get("country", "US"),
             "phone": parts.get("phone", "")
         }
-
         token = get_cj_token()
         if not token:
             await ctx.send("❌ Could not connect to CJ Dropshipping.")
             return
-
         if not vid:
             products = search_cj_product(product_name, token)
             if not products:
@@ -347,13 +332,10 @@ async def fulfill_order(ctx, *, args):
                 return
             pid = products[0].get("pid", "")
             vid = get_product_vid(pid, token)
-
         if not vid:
             await ctx.send("❌ Could not find VID. Try !search first.")
             return
-
         result = create_cj_order(token, vid, quantity, customer)
-
         if result.get("result"):
             order_id = result["data"].get("orderId", "N/A")
             embed = discord.Embed(title="✅ ORDER PLACED SUCCESSFULLY", color=0x00ff88, timestamp=datetime.now())
@@ -367,7 +349,6 @@ async def fulfill_order(ctx, *, args):
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"❌ Order failed: {result.get('message', 'Unknown error')}")
-
     except Exception as e:
         await ctx.send(f"❌ Error: {e}")
 
@@ -426,6 +407,8 @@ async def send_trending_products():
             embed.add_field(name="🐦 Twitter Caption", value=marketing.get("twitter_caption", "N/A"), inline=False)
             hashtags = " ".join(marketing.get("hashtags", []))
             embed.add_field(name="📌 Hashtags", value=hashtags, inline=False)
+            embed.add_field(name="🎬 Pika.art Video Prompt", value=marketing.get("pika_prompt", "N/A"), inline=False)
+            embed.add_field(name="🎥 Kling AI Video Prompt", value=marketing.get("kling_prompt", "N/A"), inline=False)
             embed.add_field(name="🔍 Find Supplier", value=f"`!search {product['name']}`", inline=False)
             await channel.send(embed=embed)
             await asyncio.sleep(3)
@@ -433,10 +416,10 @@ async def send_trending_products():
             await channel.send(f"⚠️ Error: {e}")
 
 # ========================
-# START FLASK + BOT
+# START
 # ========================
 def run_flask():
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 @bot.event
