@@ -1,4 +1,7 @@
+cat > requirements.txt << 'EOF'
 discord.py
 requests
 beautifulsoup4
 groq
+flask
+EOF
