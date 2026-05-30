@@ -1,4 +1,3 @@
-cat > index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,15 +13,14 @@ cat > index.html << 'EOF'
   .hero { text-align: center; padding: 40px 20px; background: #111; }
   .hero h2 { font-size: 1.8rem; color: #ff4500; }
   .hero p { color: #aaa; margin-top: 10px; font-size: 1rem; }
+  .whatsapp-btn { display: inline-block; background: #25D366; color: #fff; padding: 12px 25px; border-radius: 25px; text-decoration: none; font-weight: 700; margin-top: 15px; font-size: 0.95rem; }
   .products { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 40px 20px; }
   .card { background: #1a1a1a; border-radius: 16px; width: 300px; overflow: hidden; border: 1px solid #333; transition: transform 0.2s; }
   .card:hover { transform: translateY(-5px); }
   .card img { width: 100%; height: 200px; object-fit: cover; }
   .card-body { padding: 20px; }
   .card-body h3 { font-size: 1.1rem; color: #fff; }
-  .card-body p { color: #aaa; font-size: 0.85rem; margin-top: 8px; }
   .price { font-size: 1.4rem; color: #ff4500; font-weight: 800; margin-top: 10px; }
-  .profit { font-size: 0.8rem; color: #00ff88; margin-top: 4px; }
   .btn { display: block; background: linear-gradient(135deg, #ff4500, #ff8c00); color: #fff; text-align: center; padding: 14px; border-radius: 10px; margin-top: 15px; font-weight: 700; text-decoration: none; font-size: 1rem; cursor: pointer; border: none; width: 100%; }
   .btn:hover { opacity: 0.9; }
   .how { background: #111; padding: 40px 20px; text-align: center; }
@@ -35,13 +33,17 @@ cat > index.html << 'EOF'
   .payment h2 { font-size: 1.5rem; color: #ff4500; margin-bottom: 20px; }
   .payment-icons { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
   .payment-icons span { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 10px 20px; color: #fff; font-size: 0.9rem; }
-  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999; justify-content: center; align-items: center; }
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999; justify-content: center; align-items: center; overflow-y: auto; }
   .modal.active { display: flex; }
-  .modal-box { background: #1a1a1a; border-radius: 16px; padding: 30px; width: 90%; max-width: 450px; border: 1px solid #333; }
+  .modal-box { background: #1a1a1a; border-radius: 16px; padding: 30px; width: 90%; max-width: 450px; border: 1px solid #333; margin: 20px auto; }
   .modal-box h3 { font-size: 1.3rem; color: #ff4500; margin-bottom: 20px; }
-  .modal-box input { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; font-size: 0.9rem; margin-bottom: 12px; }
+  .modal-box input, .modal-box select { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 12px; color: #fff; font-size: 0.9rem; margin-bottom: 12px; }
   .modal-box input::placeholder { color: #666; }
-  .close-btn { background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-right: 10px; }
+  .modal-box select option { background: #111; }
+  .close-btn { background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; }
+  .payment-details { background: #111; border-radius: 10px; padding: 15px; margin: 10px 0; text-align: left; }
+  .payment-details p { color: #fff; margin: 8px 0; font-size: 0.9rem; }
+  .payment-details strong { color: #ff4500; }
   footer { text-align: center; padding: 20px; color: #555; font-size: 0.8rem; background: #111; }
 </style>
 </head>
@@ -55,103 +57,17 @@ cat > index.html << 'EOF'
 <div class="hero">
   <h2>Trending Products. Unbeatable Prices.</h2>
   <p>We find the hottest products so you don't have to. Fast shipping worldwide.</p>
+  <a href="https://wa.me/2348054490148" target="_blank" class="whatsapp-btn">💬 Chat on WhatsApp</a>
 </div>
 
 <div class="products" id="products">
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/09/4781aff3-e157-46e2-9144-fec36a33dd91.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Toe Separator">
-    <div class="card-body">
-      <h3>Toe Separator</h3>
-      <div class="price">$4.83</div>
-      <button class="btn" onclick="openOrder('Toe Separator', '$4.83')">🛒 Buy Now</button>
-    </div>
-  </div>
+</div>
 
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/08/f7cc8fae-caf9-4178-85e2-347dbb1bf313.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Pressure Bandage Sports Kneepad">
-    <div class="card-body">
-      <h3>Pressure Bandage Sports Kneepad</h3>
-      <div class="price">$4.83</div>
-      <button class="btn" onclick="openOrder('Pressure Bandage Sports Kneepad', '$4.83')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://cf.cjdropshipping.com/quick/product/bed37ecb-0f21-4309-8146-b42242c05f0a.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="V-neck Knitted Fashion Casual Womens Striped">
-    <div class="card-body">
-      <h3>V-neck Knitted Fashion Casual Womens Striped</h3>
-      <div class="price">$12.58</div>
-      <button class="btn" onclick="openOrder('V-neck Knitted Fashion Casual Womens Striped', '$12.58')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/08/764c7178-ffae-4b19-9fb3-f5736f5a20ea.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Pet Eye Care Drops">
-    <div class="card-body">
-      <h3>Pet Eye Care Drops</h3>
-      <div class="price">$3.4</div>
-      <button class="btn" onclick="openOrder('Pet Eye Care Drops', '$3.4')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://cf.cjdropshipping.com/quick/product/7acac9f4-fe4e-4a42-830f-99e43808e2dd.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Arrival Womens Solid-Color Lace-Trimmed Strap Vest">
-    <div class="card-body">
-      <h3>Arrival Womens Solid-Color Lace-Trimmed Strap Vest</h3>
-      <div class="price">$8.8</div>
-      <button class="btn" onclick="openOrder('Arrival Womens Solid-Color Lace-Trimmed Strap Vest', '$8.8')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/08/20d36f25-5e0b-4a5e-81e6-ef7113da0826.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Pet Oral Care Spray">
-    <div class="card-body">
-      <h3>Pet Oral Care Spray</h3>
-      <div class="price">$3.4</div>
-      <button class="btn" onclick="openOrder('Pet Oral Care Spray', '$3.4')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/08/c16c5373-de05-4483-883f-097ccc53a5e2.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Dietary Supplement">
-    <div class="card-body">
-      <h3>Dietary Supplement</h3>
-      <div class="price">$9.22</div>
-      <button class="btn" onclick="openOrder('Dietary Supplement', '$9.22')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://cf.cjdropshipping.com/quick/product/ade3de35-61b8-4834-96b4-fcef9154e1c1.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Long-sleeved Sun-protective Cardigan, Womens Beach Vacation ">
-    <div class="card-body">
-      <h3>Long-sleeved Sun-protective Cardigan, Womens Beach Vacation </h3>
-      <div class="price">$10.48</div>
-      <button class="btn" onclick="openOrder('Long-sleeved Sun-protective Cardigan, Womens Beach Vacation ', '$10.48')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/08/8db9d976-e042-4d9d-bec1-1ba041171a8a.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Dog Anxiety Vest Emotion-Calming Apparel Pet Jacket Vest Dog">
-    <div class="card-body">
-      <h3>Dog Anxiety Vest Emotion-Calming Apparel Pet Jacket Vest Dog</h3>
-      <div class="price">$7.9</div>
-      <button class="btn" onclick="openOrder('Dog Anxiety Vest Emotion-Calming Apparel Pet Jacket Vest Dog', '$7.9')">🛒 Buy Now</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://oss-cf.cjdropshipping.com/product/2026/05/30/08/8cc4090c-6f48-42ef-8d40-f8da0766e2dd.jpg" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="Dietary Supplement">
-    <div class="card-body">
-      <h3>Dietary Supplement</h3>
-      <div class="price">$7.03</div>
-      <button class="btn" onclick="openOrder('Dietary Supplement', '$7.03')">🛒 Buy Now</button>
-    </div>
-  </div>
 <div class="how">
   <h2>How It Works</h2>
   <div class="steps">
     <div class="step"><div class="num">1</div><p>Pick your product and click Buy Now</p></div>
-    <div class="step"><div class="num">2</div><p>Fill in your details and pay securely</p></div>
+    <div class="step"><div class="num">2</div><p>Fill in your details and choose payment</p></div>
     <div class="step"><div class="num">3</div><p>We process your order within 24 hours</p></div>
     <div class="step"><div class="num">4</div><p>Receive tracking ID and get your product</p></div>
   </div>
@@ -160,32 +76,20 @@ cat > index.html << 'EOF'
 <div class="payment">
   <h2>We Accept</h2>
   <div class="payment-icons">
-    <span>🏦 Bank Transfer</span>
-    <span>₿ Crypto</span>
     <span>💳 Flutterwave</span>
-    <span>📱 MiniPay</span>
+    <span>🏦 Bank Transfer</span>
+    <span>₿ Crypto (USDT)</span>
+    <span>🌍 ChipperCash</span>
   </div>
 </div>
 
 <footer>
   © 2026 TrendDrop. All rights reserved. Fast worldwide shipping.
+  <br><a href="https://wa.me/2348054490148" style="color:#25D366;">WhatsApp Support</a>
 </footer>
 
-<!-- ORDER MODAL -->
 <div class="modal" id="orderModal">
-  <div class="modal-box">
-    <h3>🛒 Order: <span id="modalProduct"></span></h3>
-    <p style="color:#aaa; margin-bottom:15px; font-size:0.85rem;">Price: <span id="modalPrice" style="color:#ff4500; font-weight:800;"></span></p>
-    <input type="text" id="custName" placeholder="Full Name">
-    <input type="text" id="custAddress" placeholder="Street Address">
-    <input type="text" id="custCity" placeholder="City">
-    <input type="text" id="custProvince" placeholder="State / Province">
-    <input type="text" id="custZip" placeholder="ZIP / Postal Code">
-    <input type="text" id="custCountry" placeholder="Country (e.g. NG, US, UK)">
-    <input type="text" id="custPhone" placeholder="Phone Number">
-    <input type="email" id="custEmail" placeholder="Email Address">
-    <button class="btn" onclick="submitOrder()">💳 Proceed to Payment</button>
-    <button class="close-btn" onclick="closeOrder()" style="margin-top:10px; width:100%;">Cancel</button>
+  <div class="modal-box" id="modalContent">
   </div>
 </div>
 
@@ -196,8 +100,27 @@ let currentPrice = '';
 function openOrder(product, price) {
   currentProduct = product;
   currentPrice = price;
-  document.getElementById('modalProduct').textContent = product;
-  document.getElementById('modalPrice').textContent = price;
+  document.getElementById('modalContent').innerHTML = `
+    <h3>🛒 Order: ${product}</h3>
+    <p style="color:#aaa; margin-bottom:15px; font-size:0.85rem;">Price: <span style="color:#ff4500; font-weight:800;">${price}</span></p>
+    <input type="text" id="custName" placeholder="Full Name *">
+    <input type="text" id="custAddress" placeholder="Street Address *">
+    <input type="text" id="custCity" placeholder="City *">
+    <input type="text" id="custProvince" placeholder="State / Province">
+    <input type="text" id="custZip" placeholder="ZIP / Postal Code *">
+    <input type="text" id="custCountry" placeholder="Country (e.g. NG, US, UK) *">
+    <input type="text" id="custPhone" placeholder="Phone Number *">
+    <input type="email" id="custEmail" placeholder="Email Address">
+    <select id="paymentMethod" style="width:100%; background:#111; border:1px solid #333; border-radius:8px; padding:12px; color:#fff; font-size:0.9rem; margin-bottom:12px;">
+      <option value="">-- Select Payment Method --</option>
+      <option value="flutterwave">💳 Flutterwave (Card/Bank/USSD)</option>
+      <option value="bank">🏦 Direct Bank Transfer (Moniepoint)</option>
+      <option value="crypto">₿ Crypto (USDT TRC20)</option>
+      <option value="chipper">🌍 ChipperCash International</option>
+    </select>
+    <button class="btn" onclick="submitOrder()">Proceed to Payment</button>
+    <button class="close-btn" onclick="closeOrder()">Cancel</button>
+  `;
   document.getElementById('orderModal').classList.add('active');
 }
 
@@ -214,16 +137,16 @@ async function submitOrder() {
   const country = document.getElementById('custCountry').value;
   const phone = document.getElementById('custPhone').value;
   const email = document.getElementById('custEmail').value;
+  const payment = document.getElementById('paymentMethod').value;
 
-  if (!name || !address || !city || !zip || !country || !phone) {
-    alert('Please fill in all required fields.');
+  if (!name || !address || !city || !zip || !country || !phone || !payment) {
+    alert('Please fill in all required fields and select a payment method.');
     return;
   }
 
-  // Send order to Discord webhook
-  const webhookUrl = 'DISCORD_WEBHOOK_URL';
+  const webhookUrl = 'https://discord.com/api/webhooks/1509872496839753850/_g-ShGX7vm_ihP5cXcoCcvTT1K7X1YRKRCLHCwkSI-PJh5MLMOU1b-P0hRdx56Na9JmP';
   const message = {
-    content: `🛒 **NEW ORDER**\n**Product:** ${currentProduct}\n**Price:** ${currentPrice}\n**Name:** ${name}\n**Address:** ${address}\n**City:** ${city}\n**Province:** ${province}\n**ZIP:** ${zip}\n**Country:** ${country}\n**Phone:** ${phone}\n**Email:** ${email}\n\n**Fulfill command:**\n\`!fulfill product=${currentProduct.replace(/ /g,'-')} orders=1 name=${name.replace(/ /g,'_')} address=${address.replace(/ /g,'_')} city=${city.replace(/ /g,'_')} province=${province} zip=${zip} country=${country} phone=${phone}\``
+    content: `🛒 **NEW ORDER**\n**Product:** ${currentProduct}\n**Price:** ${currentPrice}\n**Name:** ${name}\n**Address:** ${address}, ${city}, ${province}, ${zip}, ${country}\n**Phone:** ${phone}\n**Email:** ${email}\n**Payment:** ${payment}\n\n**Fulfill command:**\n\`!fulfill product=${currentProduct.replace(/ /g,'-')} orders=1 name=${name.replace(/ /g,'_')} address=${address.replace(/ /g,'_')} city=${city.replace(/ /g,'_')} province=${province} zip=${zip} country=${country} phone=${phone}\``
   };
 
   try {
@@ -236,11 +159,52 @@ async function submitOrder() {
     console.log('Webhook error:', e);
   }
 
-  // Redirect to Flutterwave payment
-  window.location.href = 'https://flutterwave.com/pay/ocoagewms2em';
+  if (payment === 'flutterwave') {
+    window.location.href = 'https://flutterwave.com/pay/ocoagewms2em';
+
+  } else if (payment === 'bank') {
+    document.getElementById('modalContent').innerHTML = `
+      <h3>🏦 Bank Transfer Details</h3>
+      <p style="color:#aaa; margin:10px 0;">Send <strong style="color:#ff4500;">${currentPrice}</strong> to:</p>
+      <div class="payment-details">
+        <p><strong>Bank:</strong> Moniepoint</p>
+        <p><strong>Account Name:</strong> Tawari Divine Doubra</p>
+        <p><strong>Account Number:</strong> 9138643885</p>
+      </div>
+      <p style="color:#aaa; margin-top:15px; font-size:0.85rem;">After payment send proof to WhatsApp:</p>
+      <a href="https://wa.me/2348054490148?text=I just paid for ${currentProduct} - ${currentPrice}" target="_blank" class="btn" style="margin-top:10px;">💬 Send Payment Proof on WhatsApp</a>
+      <button class="close-btn" onclick="closeOrder()">Done</button>
+    `;
+
+  } else if (payment === 'crypto') {
+    document.getElementById('modalContent').innerHTML = `
+      <h3>₿ Crypto Payment (USDT TRC20)</h3>
+      <p style="color:#aaa; margin:10px 0;">Send <strong style="color:#ff4500;">${currentPrice}</strong> worth of USDT to:</p>
+      <div class="payment-details">
+        <p><strong>Network:</strong> TRC20 (Tron)</p>
+        <p style="word-break:break-all;"><strong>Wallet:</strong> A7QAeparc1Pn1vYBrQwUwd2djpVWkr7qCJ15zf1gHiQG</p>
+      </div>
+      <p style="color:#aaa; margin-top:15px; font-size:0.85rem;">After payment send proof to WhatsApp:</p>
+      <a href="https://wa.me/2348054490148?text=I just paid crypto for ${currentProduct} - ${currentPrice}" target="_blank" class="btn" style="margin-top:10px;">💬 Send Payment Proof on WhatsApp</a>
+      <button class="close-btn" onclick="closeOrder()">Done</button>
+    `;
+
+  } else if (payment === 'chipper') {
+    document.getElementById('modalContent').innerHTML = `
+      <h3>🌍 ChipperCash International</h3>
+      <p style="color:#aaa; margin:10px 0;">Send <strong style="color:#ff4500;">${currentPrice}</strong> to:</p>
+      <div class="payment-details">
+        <p><strong>Bank:</strong> Paystack-Titan</p>
+        <p><strong>Account Name:</strong> CHIPPERCASH/TAWARI DIVINE</p>
+        <p><strong>Account Number:</strong> 9737300578</p>
+      </div>
+      <p style="color:#aaa; margin-top:15px; font-size:0.85rem;">After payment send proof to WhatsApp:</p>
+      <a href="https://wa.me/2348054490148?text=I just paid via ChipperCash for ${currentProduct} - ${currentPrice}" target="_blank" class="btn" style="margin-top:10px;">💬 Send Payment Proof on WhatsApp</a>
+      <button class="close-btn" onclick="closeOrder()">Done</button>
+    `;
+  }
 }
 </script>
 
 </body>
 </html>
-EOF
