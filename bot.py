@@ -16,7 +16,8 @@ from flask import Flask, request, jsonify
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 CJ_API_KEY = os.environ.get("CJ_API_KEY")
-KLING_API_KEY = os.environ.get("KLING_API_KEY")  # Ensure this matches your Render Env Variable Name
+KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY")
+KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY")  # Ensure this matches your Render Env Variable Name
 CHANNEL_ID = 1509172843265396903
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK")
 FLUTTERWAVE_SECRET = os.environ.get("FLUTTERWAVE_SECRET", "")
@@ -35,38 +36,42 @@ app = Flask(__name__)
 # ============================================
 
 def submit_kling_video(image_url, prompt_text):
-    """Submits the image-to-video workflow parameter card to Kling AI"""
-    if not KLING_API_KEY:
-        print("[KLING ERROR] Missing KLING_API_KEY engine environment flag.")
+    if not KLING_ACCESS_KEY or not KLING_SECRET_KEY:
+        print("[KLING ERROR] Missing Kling API keys.")
         return None
-        
-    url = f"{KLING_BASE_URL}/videos/generations"
+
+    import jwt
+    import time
+
+    payload = {
+        "iss": KLING_ACCESS_KEY,
+        "exp": int(time.time()) + 1800,
+        "nbf": int(time.time()) - 5
+    }
+    token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
+
+    url = f"{KLING_BASE_URL}/videos/image2video"
     headers = {
-        "Authorization": f"Bearer {KLING_API_KEY}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    
-    # Dropshipping focused configuration footprint (9:16 portrait for Shorts/TikTok ads)
     data = {
-        "model": "kling-v1-standard-image-to-video",
+        "model_name": "kling-v1",
         "image": image_url,
-        "prompt": f"E-commerce commercial look, studio lighting, hyperrealistic product focus: {prompt_text}",
-        "duration": 5,
+        "prompt": f"E-commerce commercial, studio lighting, hyperrealistic product focus: {prompt_text}",
+        "duration": "5",
         "mode": "std",
-        "aspect_ratio": "9:16"
+        "cfg_scale": 0.5
     }
-    
     try:
         res = requests.post(url, json=data, headers=headers, timeout=15)
         if res.status_code in [200, 201]:
             response_json = res.json()
-            # Extracts task footprint depending on platform API schema layout
-            return response_json.get("data", {}).get("task_id") or response_json.get("id")
-        print(f"[KLING SUBMIT FAIL] Status Code: {res.status_code} | Msg: {res.text}")
+            return response_json.get("data", {}).get("task_id")
+        print(f"[KLING SUBMIT FAIL] Status: {res.status_code} | {res.text}")
     except Exception as e:
         print(f"[KLING SUBMIT EXCEPTION] {e}")
     return None
-
 def check_kling_status(task_id, max_retries=25, sleep_window=15):
     """Polls the cloud server until the high-res mp4 URL payload is compiled"""
     url = f"{KLING_BASE_URL}/tasks/{task_id}"
