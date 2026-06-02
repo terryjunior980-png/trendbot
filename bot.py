@@ -10,18 +10,90 @@ import re
 import threading
 from flask import Flask, request, jsonify
 
+# ============================================
+# CONFIGURATION & RECOVERY PARAMETERS
+# ============================================
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 CJ_API_KEY = os.environ.get("CJ_API_KEY")
+KLING_API_KEY = os.environ.get("KLING_API_KEY")  # Ensure this matches your Render Env Variable Name
 CHANNEL_ID = 1509172843265396903
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK")
 FLUTTERWAVE_SECRET = os.environ.get("FLUTTERWAVE_SECRET", "")
+
+# Unified Kling Endpoints (Update this base URL if you are using a proxy aggregator like AIML/Segmind)
+KLING_BASE_URL = "https://api.klingai.com/v1" 
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 client_ai = Groq(api_key=GROQ_API_KEY)
 app = Flask(__name__)
+
+# ============================================
+# KLING AI ENGINE (SYNCHRONOUS COMPONENT)
+# ============================================
+
+def submit_kling_video(image_url, prompt_text):
+    """Submits the image-to-video workflow parameter card to Kling AI"""
+    if not KLING_API_KEY:
+        print("[KLING ERROR] Missing KLING_API_KEY engine environment flag.")
+        return None
+        
+    url = f"{KLING_BASE_URL}/videos/generations"
+    headers = {
+        "Authorization": f"Bearer {KLING_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    # Dropshipping focused configuration footprint (9:16 portrait for Shorts/TikTok ads)
+    data = {
+        "model": "kling-v1-standard-image-to-video",
+        "image": image_url,
+        "prompt": f"E-commerce commercial look, studio lighting, hyperrealistic product focus: {prompt_text}",
+        "duration": 5,
+        "mode": "std",
+        "aspect_ratio": "9:16"
+    }
+    
+    try:
+        res = requests.post(url, json=data, headers=headers, timeout=15)
+        if res.status_code in [200, 201]:
+            response_json = res.json()
+            # Extracts task footprint depending on platform API schema layout
+            return response_json.get("data", {}).get("task_id") or response_json.get("id")
+        print(f"[KLING SUBMIT FAIL] Status Code: {res.status_code} | Msg: {res.text}")
+    except Exception as e:
+        print(f"[KLING SUBMIT EXCEPTION] {e}")
+    return None
+
+def check_kling_status(task_id, max_retries=25, sleep_window=15):
+    """Polls the cloud server until the high-res mp4 URL payload is compiled"""
+    url = f"{KLING_BASE_URL}/tasks/{task_id}"
+    headers = {"Authorization": f"Bearer {KLING_API_KEY}"}
+    
+    for attempt in range(max_retries):
+        try:
+            res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                body = res.json()
+                data_block = body.get("data", body)
+                status = data_block.get("task_status") or data_block.get("status")
+                
+                print(f"[KLING POLLING] Checking instance {task_id}... State: {status}")
+                
+                if status in ["succeed", "COMPLETED"]:
+                    result_payload = data_block.get("task_result") or data_block.get("result", {})
+                    return result_payload.get("video_url")
+                elif status in ["failed", "FAILED", "cancelled"]:
+                    print(f"[KLING RENDER CRASH] Server failed execution loop for task {task_id}.")
+                    return None
+        except Exception as e:
+            print(f"[KLING STATUS EXCEPTION] {e}")
+            
+        import time
+        time.sleep(sleep_window)
+    return None
 
 # ========================
 # FLUTTERWAVE WEBHOOK
@@ -200,15 +272,7 @@ def get_trending_products():
         print(f"CJ trending error: {e}")
     return [
         {"name": "LED Strip Lights", "source": "Trending", "image": "https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=400", "price": "8.99"},
-        {"name": "Portable Blender", "source": "Trending", "image": "https://images.unsplash.com/photo-1502743780242-f10c78f797c7?w=400", "price": "12.99"},
-        {"name": "Wireless Earbuds", "source": "Trending", "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400", "price": "15.99"},
-        {"name": "Phone Ring Holder", "source": "Trending", "image": "https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=400", "price": "3.99"},
-        {"name": "Mini Projector", "source": "Trending", "image": "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400", "price": "35.99"},
-        {"name": "Posture Corrector", "source": "Trending", "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400", "price": "9.99"},
-        {"name": "Electric Massage Gun", "source": "Trending", "image": "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400", "price": "25.99"},
-        {"name": "Smart Watch", "source": "Trending", "image": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400", "price": "22.99"},
-        {"name": "Car Phone Mount", "source": "Trending", "image": "https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=400", "price": "5.99"},
-        {"name": "Resistance Bands", "source": "Trending", "image": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400", "price": "7.99"},
+        {"name": "Portable Blender", "source": "Trending", "image": "https://images.unsplash.com/photo-1502743780242-f10c78f797c7?w=400", "price": "12.99"}
     ]
 
 def generate_marketing_content(product_name):
@@ -380,7 +444,7 @@ async def track_order(ctx, order_id: str):
         await ctx.send(f"❌ Error: {e}")
 
 # ========================
-# TRENDING TASK
+# TRENDING TASK WITH KLING AI
 # ========================
 @tasks.loop(hours=6)
 async def send_trending_products():
@@ -390,7 +454,10 @@ async def send_trending_products():
     await channel.send("🔍 **Scanning for trending products...**")
     products = get_trending_products()
     update_store_page(products)
-    for product in products[:5]:
+    
+    # We will limit video generation processing to the top 2 products per cycle 
+    # to avoid overwhelming the Render instance background queue
+    for product in products[:2]:
         try:
             marketing = generate_marketing_content(product["name"])
             embed = discord.Embed(
@@ -410,10 +477,39 @@ async def send_trending_products():
             embed.add_field(name="🎬 Pika.art Video Prompt", value=marketing.get("pika_prompt", "N/A"), inline=False)
             embed.add_field(name="🎥 Kling AI Video Prompt", value=marketing.get("kling_prompt", "N/A"), inline=False)
             embed.add_field(name="🔍 Find Supplier", value=f"`!search {product['name']}`", inline=False)
+            
+            # Send initial embed framework containing the marketing copy data
             await channel.send(embed=embed)
-            await asyncio.sleep(3)
+            
+            # ---------------------------------------------------------
+            # INTEGRATED ASYNC KLING GENERATION SEQUENCE
+            # ---------------------------------------------------------
+            img_url = product.get("image")
+            video_prompt = marketing.get("kling_prompt")
+            
+            if img_url and video_prompt:
+                status_msg = await channel.send(f"🎬 *Submitting '{product['name']}' to Kling AI engine...*")
+                
+                # Hand off synchronous post requests to background executor thread
+                loop = asyncio.get_running_loop()
+                task_id = await loop.run_in_executor(None, submit_kling_video, img_url, video_prompt)
+                
+                if task_id:
+                    await status_msg.edit(content=f"⏳ *Kling task compiled (`{task_id}`). Rendering cinematic MP4 creative...*")
+                    # Poll for completion link
+                    video_url = await loop.run_in_executor(None, check_kling_status, task_id)
+                    
+                    if video_url:
+                        await status_msg.edit(content=f"✅ **Kling Video Ad Ready!**\n{video_url}")
+                    else:
+                        await status_msg.edit(content="⚠️ *Kling render execution timed out or failed on the cluster queue.*")
+                else:
+                    await status_msg.edit(content="❌ *Could not register task with Kling API endpoint.*")
+            # ---------------------------------------------------------
+            
+            await asyncio.sleep(5)
         except Exception as e:
-            await channel.send(f"⚠️ Error: {e}")
+            await channel.send(f"⚠️ Error processing {product.get('name', 'Product')}: {e}")
 
 # ========================
 # START
