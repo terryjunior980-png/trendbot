@@ -50,7 +50,7 @@ def submit_kling_video(image_url, prompt_text):
     }
     token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
 
-    url = f"{KLING_BASE_URL}/videos/image2video"
+    url = "https://api.klingai.com/v1/videos/image2video"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -58,13 +58,14 @@ def submit_kling_video(image_url, prompt_text):
     data = {
         "model_name": "kling-v1",
         "image": image_url,
-        "prompt": f"E-commerce commercial, studio lighting, hyperrealistic product focus: {prompt_text}",
+        "prompt": prompt_text,
         "duration": "5",
         "mode": "std",
         "cfg_scale": 0.5
     }
     try:
         res = requests.post(url, json=data, headers=headers, timeout=15)
+        print(f"[KLING RESPONSE] {res.status_code} | {res.text}")
         if res.status_code in [200, 201]:
             response_json = res.json()
             return response_json.get("data", {}).get("task_id")
@@ -72,31 +73,37 @@ def submit_kling_video(image_url, prompt_text):
     except Exception as e:
         print(f"[KLING SUBMIT EXCEPTION] {e}")
     return None
-def check_kling_status(task_id, max_retries=25, sleep_window=15):
-    """Polls the cloud server until the high-res mp4 URL payload is compiled"""
-    url = f"{KLING_BASE_URL}/tasks/{task_id}"
-    headers = {"Authorization": f"Bearer {KLING_API_KEY}"}
+def check_kling_status(task_id, max_retries=20, sleep_window=15):
+    import jwt
+    import time
+
+    payload = {
+        "iss": KLING_ACCESS_KEY,
+        "exp": int(time.time()) + 1800,
+        "nbf": int(time.time()) - 5
+    }
+    token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
     
+    url = f"https://api.klingai.com/v1/videos/image2video/{task_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+
     for attempt in range(max_retries):
         try:
             res = requests.get(url, headers=headers, timeout=10)
             if res.status_code == 200:
                 body = res.json()
-                data_block = body.get("data", body)
-                status = data_block.get("task_status") or data_block.get("status")
-                
-                print(f"[KLING POLLING] Checking instance {task_id}... State: {status}")
-                
-                if status in ["succeed", "COMPLETED"]:
-                    result_payload = data_block.get("task_result") or data_block.get("result", {})
-                    return result_payload.get("video_url")
-                elif status in ["failed", "FAILED", "cancelled"]:
-                    print(f"[KLING RENDER CRASH] Server failed execution loop for task {task_id}.")
+                data_block = body.get("data", {})
+                status = data_block.get("task_status")
+                print(f"[KLING POLLING] Task {task_id} Status: {status}")
+                if status == "succeed":
+                    videos = data_block.get("task_result", {}).get("videos", [])
+                    if videos:
+                        return videos[0].get("url")
+                elif status == "failed":
+                    print(f"[KLING FAILED] Task {task_id} failed.")
                     return None
         except Exception as e:
             print(f"[KLING STATUS EXCEPTION] {e}")
-            
-        import time
         time.sleep(sleep_window)
     return None
 
