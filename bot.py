@@ -2,28 +2,27 @@ import discord
 from discord.ext import commands, tasks
 import requests
 from groq import Groq
+from bs4 import BeautifulSoup
 import json
 import asyncio
 from datetime import datetime
 import os
 import re
 import threading
+import random
+import time
 from flask import Flask, request, jsonify
 
-# ============================================
-# CONFIGURATION & RECOVERY PARAMETERS
-# ============================================
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 CJ_API_KEY = os.environ.get("CJ_API_KEY")
-KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY")
-KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY")  # Ensure this matches your Render Env Variable Name
 CHANNEL_ID = 1509172843265396903
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK")
 FLUTTERWAVE_SECRET = os.environ.get("FLUTTERWAVE_SECRET", "")
-
-# Unified Kling Endpoints (Update this base URL if you are using a proxy aggregator like AIML/Segmind)
-KLING_BASE_URL = "https://api.klingai.com/v1" 
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME")
+KLING_ACCESS_KEY = os.environ.get("KLING_ACCESS_KEY")
+KLING_SECRET_KEY = os.environ.get("KLING_SECRET_KEY")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -31,64 +30,54 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 client_ai = Groq(api_key=GROQ_API_KEY)
 app = Flask(__name__)
 
-# ============================================
-# KLING AI ENGINE (SYNCHRONOUS COMPONENT)
-# ============================================
-
+# ========================
+# KLING AI
+# ========================
 def submit_kling_video(image_url, prompt_text):
     if not KLING_ACCESS_KEY or not KLING_SECRET_KEY:
         print("[KLING ERROR] Missing Kling API keys.")
         return None
-
-    import jwt
-    import time
-
-    payload = {
-        "iss": KLING_ACCESS_KEY,
-        "exp": int(time.time()) + 1800,
-        "nbf": int(time.time()) - 5
-    }
-    token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
-
-    url = "https://api.klingai.com/v1/videos/image2video"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model_name": "kling-v1",
-        "image": image_url,
-        "prompt": prompt_text,
-        "duration": "5",
-        "mode": "std",
-        "cfg_scale": 0.5
-    }
     try:
+        import jwt
+        payload = {
+            "iss": KLING_ACCESS_KEY,
+            "exp": int(time.time()) + 1800,
+            "nbf": int(time.time()) - 5
+        }
+        token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
+        url = "https://api.klingai.com/v1/videos/image2video"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model_name": "kling-v1",
+            "image": image_url,
+            "prompt": prompt_text,
+            "duration": "5",
+            "mode": "std",
+            "cfg_scale": 0.5
+        }
         res = requests.post(url, json=data, headers=headers, timeout=15)
         print(f"[KLING RESPONSE] {res.status_code} | {res.text}")
         if res.status_code in [200, 201]:
-            response_json = res.json()
-            return response_json.get("data", {}).get("task_id")
-        print(f"[KLING SUBMIT FAIL] Status: {res.status_code} | {res.text}")
+            return res.json().get("data", {}).get("task_id")
     except Exception as e:
-        print(f"[KLING SUBMIT EXCEPTION] {e}")
+        print(f"[KLING EXCEPTION] {e}")
     return None
+
 def check_kling_status(task_id, max_retries=20, sleep_window=15):
-    import jwt
-    import time
-
-    payload = {
-        "iss": KLING_ACCESS_KEY,
-        "exp": int(time.time()) + 1800,
-        "nbf": int(time.time()) - 5
-    }
-    token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
-    
-    url = f"https://api.klingai.com/v1/videos/image2video/{task_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-
-    for attempt in range(max_retries):
-        try:
+    try:
+        import jwt
+        payload = {
+            "iss": KLING_ACCESS_KEY,
+            "exp": int(time.time()) + 1800,
+            "nbf": int(time.time()) - 5
+        }
+        token = jwt.encode(payload, KLING_SECRET_KEY, algorithm="HS256")
+        url = f"https://api.klingai.com/v1/videos/image2video/{task_id}"
+        headers = {"Authorization": f"Bearer {token}"}
+        for attempt in range(max_retries):
             res = requests.get(url, headers=headers, timeout=10)
             if res.status_code == 200:
                 body = res.json()
@@ -100,11 +89,10 @@ def check_kling_status(task_id, max_retries=20, sleep_window=15):
                     if videos:
                         return videos[0].get("url")
                 elif status == "failed":
-                    print(f"[KLING FAILED] Task {task_id} failed.")
                     return None
-        except Exception as e:
-            print(f"[KLING STATUS EXCEPTION] {e}")
-        time.sleep(sleep_window)
+            time.sleep(sleep_window)
+    except Exception as e:
+        print(f"[KLING STATUS EXCEPTION] {e}")
     return None
 
 # ========================
@@ -168,13 +156,8 @@ async def auto_fulfill(product_name, name, address, city, province, zip_code, co
                 await channel.send(f"❌ Auto fulfill failed: No VID found for {product_name}")
             return
         customer = {
-            "name": name,
-            "address": address,
-            "city": city,
-            "province": province,
-            "zip": zip_code,
-            "country": country,
-            "phone": phone
+            "name": name, "address": address, "city": city,
+            "province": province, "zip": zip_code, "country": country, "phone": phone
         }
         result = create_cj_order(token, vid, 1, customer)
         if result.get("result"):
@@ -253,80 +236,213 @@ def get_order_tracking(order_id, token):
     res = requests.get(url, headers=headers, timeout=10)
     return res.json()
 
+# ========================
+# AMAZON BEST SELLERS SCRAPER
+# ========================
+def get_amazon_trending():
+    products = []
+    categories = [
+        "https://www.amazon.com/Best-Sellers-Health-Personal-Care/zgbs/hpc",
+        "https://www.amazon.com/Best-Sellers-Sports-Outdoors/zgbs/sporting-goods",
+        "https://www.amazon.com/Best-Sellers-Beauty/zgbs/beauty",
+        "https://www.amazon.com/gp/movers-and-shakers/hpc",
+        "https://www.amazon.com/gp/movers-and-shakers/sporting-goods",
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+    }
+    try:
+        url = random.choice(categories)
+        res = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(res.text, "html.parser")
+        items = soup.find_all("div", {"class": "zg-item-immersion"}, limit=10)
+        if not items:
+            items = soup.find_all("div", {"class": "p13n-sc-uncoverable-faceout"}, limit=10)
+        for item in items:
+            title = item.find("span", {"class": "zg-item"}) or item.find("a", {"class": "a-link-normal"})
+            img = item.find("img")
+            if title and title.text.strip():
+                image_url = img.get("src", "") if img else ""
+                products.append({
+                    "name": title.text.strip()[:60],
+                    "source": "Amazon Best Sellers",
+                    "image": image_url,
+                    "price": "0"
+                })
+        print(f"Amazon scraped {len(products)} products")
+    except Exception as e:
+        print(f"Amazon scrape error: {e}")
+    return products
+
+# ========================
+# TIKTOK TRENDING SCRAPER
+# ========================
+def get_tiktok_trending():
+    products = []
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        urls = [
+            "https://www.tiktok.com/discover",
+            "https://www.tiktok.com/trending"
+        ]
+        for url in urls:
+            try:
+                res = requests.get(url, headers=headers, timeout=10)
+                soup = BeautifulSoup(res.text, "html.parser")
+                tags = soup.find_all("span", limit=50)
+                for tag in tags:
+                    text = tag.text.strip()
+                    if len(text) > 5 and len(text) < 50 and "#" not in text:
+                        products.append({
+                            "name": text,
+                            "source": "TikTok Trending",
+                            "image": "",
+                            "price": "0"
+                        })
+                if products:
+                    break
+            except:
+                continue
+        print(f"TikTok scraped {len(products)} trends")
+    except Exception as e:
+        print(f"TikTok scrape error: {e}")
+    return products[:5]
+
+# ========================
+# MAIN TRENDING PRODUCTS
+# ========================
 def get_trending_products():
+    all_products = []
+
+    # Source 1: Amazon Best Sellers
+    amazon_products = get_amazon_trending()
+    if amazon_products:
+        all_products.extend(amazon_products[:4])
+        print(f"Got {len(amazon_products)} from Amazon")
+
+    # Source 2: TikTok Trending
+    tiktok_products = get_tiktok_trending()
+    if tiktok_products:
+        all_products.extend(tiktok_products[:3])
+        print(f"Got {len(tiktok_products)} from TikTok")
+
+    # Source 3: CJ Problem Solving Products
     try:
         token = get_cj_token()
-        if not token:
-            raise Exception("No token")
-        url = "https://developers.cjdropshipping.com/api2.0/v1/product/list"
-        headers = {"CJ-Access-Token": token}
-        params = {"pageNum": 1, "pageSize": 10, "orderBy": "hotSale"}
-        res = requests.get(url, headers=headers, params=params, timeout=10)
-        data = res.json()
-        products = []
-        if data.get("result") and data.get("data"):
-            for item in data["data"].get("list", []):
-                pid = item.get("pid", "")
-                name = item.get("productNameEn", "")
-                image = item.get("productImage", "")
-                price = item.get("sellPrice", "")
-                if name:
-                    products.append({
-                        "name": name[:60],
-                        "source": "CJ Hot Sale",
-                        "image": image,
-                        "price": price,
-                        "pid": pid
-                    })
-        if products:
-            return products[:10]
+        if token:
+            problem_keywords = [
+                "back pain relief", "posture corrector", "sleep aid",
+                "muscle massager", "knee support", "anxiety relief",
+                "neck pain", "fat burner", "skin care", "weight loss",
+                "joint pain", "migraine relief", "foot pain", "eye strain"
+            ]
+            keyword = random.choice(problem_keywords)
+            url = "https://developers.cjdropshipping.com/api2.0/v1/product/list"
+            headers = {"CJ-Access-Token": token}
+            params = {"pageNum": 1, "pageSize": 10, "productName": keyword, "orderBy": "hotSale"}
+            res = requests.get(url, headers=headers, params=params, timeout=10)
+            data = res.json()
+            if data.get("result") and data.get("data"):
+                for item in data["data"].get("list", []):
+                    name = item.get("productNameEn", "")
+                    image = item.get("productImage", "")
+                    price = item.get("sellPrice", "")
+                    pid = item.get("pid", "")
+                    if name:
+                        all_products.append({
+                            "name": name[:60],
+                            "source": "CJ Problem Solver",
+                            "image": image,
+                            "price": price,
+                            "pid": pid
+                        })
     except Exception as e:
-        print(f"CJ trending error: {e}")
+        print(f"CJ error: {e}")
+
+    # Remove duplicates
+    seen = set()
+    unique_products = []
+    for p in all_products:
+        if p["name"] not in seen and p["name"].strip():
+            seen.add(p["name"])
+            unique_products.append(p)
+
+    if unique_products:
+        return unique_products[:10]
+
+    # Fallback
     return [
-        {"name": "LED Strip Lights", "source": "Trending", "image": "https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=400", "price": "8.99"},
-        {"name": "Portable Blender", "source": "Trending", "image": "https://images.unsplash.com/photo-1502743780242-f10c78f797c7?w=400", "price": "12.99"}
+        {"name": "Posture Corrector Back Brace", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400", "price": "9.99"},
+        {"name": "Electric Muscle Massage Gun", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=400", "price": "25.99"},
+        {"name": "Knee Support Brace", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400", "price": "12.99"},
+        {"name": "Sleep Eye Mask Blackout", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400", "price": "7.99"},
+        {"name": "Neck Pain Relief Pillow", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=400", "price": "18.99"},
+        {"name": "Acne Pimple Patch Treatment", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1570554886111-e80fcca6a029?w=400", "price": "5.99"},
+        {"name": "Anti Snoring Device", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400", "price": "14.99"},
+        {"name": "Compression Socks Pain Relief", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400", "price": "8.99"},
+        {"name": "LED Face Mask Skin Care", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1570554886111-e80fcca6a029?w=400", "price": "29.99"},
+        {"name": "Resistance Bands Workout Set", "source": "Problem Solver", "image": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400", "price": "11.99"},
     ]
 
+# ========================
+# AI MARKETING
+# ========================
 def generate_marketing_content(product_name):
     prompt = f"""
-You are a viral social media marketing expert for dropshipping.
+You are a viral dropshipping expert who finds problem-solving products.
 Product: {product_name}
 Generate the following in JSON format only, no extra text, no markdown:
 {{
-  "tiktok_caption": "...",
-  "twitter_caption": "...",
+  "problem_it_solves": "What specific pain or problem does this solve?",
+  "target_audience": "Who suffers from this problem daily?",
+  "emotional_hook": "One powerful sentence that hits the emotion of someone with this problem",
+  "tiktok_script": "Hook (2 seconds) + Problem + Solution + Result + CTA. Make it viral and emotional. Max 150 words.",
+  "twitter_caption": "Problem focused tweet that makes people click. Max 280 chars.",
   "hashtags": ["...", "...", "...", "...", "...", "...", "...", "...", "...", "..."],
-  "why_trending": "...",
   "suggested_price": "...",
   "profit_margin_estimate": "...",
-  "pika_prompt": "cinematic product video of {product_name} in action showing its benefits lifestyle setting satisfying modern aesthetic trending on social media",
-  "kling_prompt": "realistic product showcase of {product_name} close up shots natural lighting people using it happily lifestyle setting high quality"
+  "urgency_line": "Why they need to buy NOW",
+  "pika_prompt": "cinematic video showing someone struggling with the problem then discovering {product_name} and feeling relief and happiness lifestyle setting emotional",
+  "kling_prompt": "realistic emotional video of someone using {product_name} to solve their problem showing transformation natural lighting lifestyle high quality"
 }}
 """
     response = client_ai.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=1000
+        max_tokens=1500
     )
     text = response.choices[0].message.content
     text = text.replace("```json", "").replace("```", "").strip()
     return json.loads(text)
 
+# ========================
+# UPDATE STORE PAGE
+# ========================
 def update_store_page(products):
     cards = ""
     for p in products[:10]:
         name = p["name"]
         image = p.get("image", "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400")
+        if not image or image.strip() == "":
+            image = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400"
         raw = str(p.get("price", "10")).split("--")[0].strip()
-        cost = float(raw) if raw.replace('.','').isdigit() else 10.0
+        try:
+            cost = float(raw) if raw.replace('.', '').isdigit() else 10.0
+        except:
+            cost = 10.0
         sell_price = round(cost * 2.5, 2)
+        safe_name = name.replace("'", "\\'")
         cards += f"""
   <div class="card">
     <img src="{image}" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400'" alt="{name}">
     <div class="card-body">
       <h3>{name}</h3>
       <div class="price">${sell_price}</div>
-      <button class="btn" onclick="openOrder('{name}', '${sell_price}')">🛒 Buy Now</button>
+      <button class="btn" onclick="openOrder('{safe_name}', '${sell_price}')">🛒 Buy Now</button>
     </div>
   </div>
 """
@@ -338,8 +454,11 @@ def update_store_page(products):
         new_html = html[:start] + cards + html[end:]
         with open("index.html", "w") as f:
             f.write(new_html)
-        os.system('git config --global user.email "trendbot@render.com" && git config --global user.name "TrendBot" && git add index.html && git commit -m "update store products" && git push')
-        print("Store updated with new products")
+        if GITHUB_TOKEN and GITHUB_USERNAME:
+            os.system(f'git config --global user.email "trendbot@render.com" && git config --global user.name "TrendBot" && git remote set-url origin https://{GITHUB_USERNAME}:{GITHUB_TOKEN}@github.com/{GITHUB_USERNAME}/trendbot.git && git add index.html && git commit -m "update store products" && git push origin HEAD:main')
+            print("Store updated and pushed to GitHub")
+        else:
+            print("Store updated locally but no GitHub token to push")
     except Exception as e:
         print(f"Store update error: {e}")
 
@@ -456,72 +575,61 @@ async def track_order(ctx, order_id: str):
         await ctx.send(f"❌ Error: {e}")
 
 # ========================
-# TRENDING TASK WITH KLING AI
+# TRENDING TASK
 # ========================
 @tasks.loop(hours=6)
 async def send_trending_products():
     channel = bot.get_channel(CHANNEL_ID)
     if not channel:
         return
-    await channel.send("🔍 **Scanning for trending products...**")
+    await channel.send("🔍 **Scanning Amazon, TikTok and CJ for trending problem solving products...**")
     products = get_trending_products()
     update_store_page(products)
-    
-    # We will limit video generation processing to the top 2 products per cycle 
-    # to avoid overwhelming the Render instance background queue
-    for product in products[:2]:
+    for product in products[:5]:
         try:
             marketing = generate_marketing_content(product["name"])
             embed = discord.Embed(
-                title=f"🔥 TRENDING: {product['name']}",
+                title=f"🔥 PROBLEM SOLVER: {product['name']}",
                 color=0xff4500,
                 timestamp=datetime.now()
             )
             embed.set_thumbnail(url=product.get("image", ""))
             embed.add_field(name="📊 Source", value=product["source"], inline=True)
-            embed.add_field(name="💡 Why Trending", value=marketing.get("why_trending", "N/A"), inline=False)
+            embed.add_field(name="😣 Problem It Solves", value=marketing.get("problem_it_solves", "N/A"), inline=False)
+            embed.add_field(name="👥 Target Audience", value=marketing.get("target_audience", "N/A"), inline=False)
+            embed.add_field(name="💥 Emotional Hook", value=marketing.get("emotional_hook", "N/A"), inline=False)
+            embed.add_field(name="🎵 TikTok Script", value=marketing.get("tiktok_script", "N/A"), inline=False)
+            embed.add_field(name="🐦 Twitter Caption", value=marketing.get("twitter_caption", "N/A"), inline=False)
+            embed.add_field(name="⚡ Urgency Line", value=marketing.get("urgency_line", "N/A"), inline=False)
             embed.add_field(name="💰 Suggested Price", value=marketing.get("suggested_price", "N/A"), inline=True)
             embed.add_field(name="📈 Profit Margin", value=marketing.get("profit_margin_estimate", "N/A"), inline=True)
-            embed.add_field(name="🎵 TikTok Caption", value=marketing.get("tiktok_caption", "N/A"), inline=False)
-            embed.add_field(name="🐦 Twitter Caption", value=marketing.get("twitter_caption", "N/A"), inline=False)
             hashtags = " ".join(marketing.get("hashtags", []))
             embed.add_field(name="📌 Hashtags", value=hashtags, inline=False)
-            embed.add_field(name="🎬 Pika.art Video Prompt", value=marketing.get("pika_prompt", "N/A"), inline=False)
-            embed.add_field(name="🎥 Kling AI Video Prompt", value=marketing.get("kling_prompt", "N/A"), inline=False)
+            embed.add_field(name="🎬 Pika.art Prompt", value=marketing.get("pika_prompt", "N/A"), inline=False)
+            embed.add_field(name="🎥 Kling AI Prompt", value=marketing.get("kling_prompt", "N/A"), inline=False)
             embed.add_field(name="🔍 Find Supplier", value=f"`!search {product['name']}`", inline=False)
-            
-            # Send initial embed framework containing the marketing copy data
             await channel.send(embed=embed)
-            
-            # ---------------------------------------------------------
-            # INTEGRATED ASYNC KLING GENERATION SEQUENCE
-            # ---------------------------------------------------------
+
+            # Kling video generation
             img_url = product.get("image")
             video_prompt = marketing.get("kling_prompt")
-            
-            if img_url and video_prompt:
-                status_msg = await channel.send(f"🎬 *Submitting '{product['name']}' to Kling AI engine...*")
-                
-                # Hand off synchronous post requests to background executor thread
+            if img_url and video_prompt and KLING_ACCESS_KEY:
+                status_msg = await channel.send(f"🎬 *Generating Kling AI video for {product['name']}...*")
                 loop = asyncio.get_running_loop()
                 task_id = await loop.run_in_executor(None, submit_kling_video, img_url, video_prompt)
-                
                 if task_id:
-                    await status_msg.edit(content=f"⏳ *Kling task compiled (`{task_id}`). Rendering cinematic MP4 creative...*")
-                    # Poll for completion link
+                    await status_msg.edit(content=f"⏳ *Rendering video... task `{task_id}`*")
                     video_url = await loop.run_in_executor(None, check_kling_status, task_id)
-                    
                     if video_url:
-                        await status_msg.edit(content=f"✅ **Kling Video Ad Ready!**\n{video_url}")
+                        await status_msg.edit(content=f"✅ **Video Ready! Download and post on TikTok:**\n{video_url}")
                     else:
-                        await status_msg.edit(content="⚠️ *Kling render execution timed out or failed on the cluster queue.*")
+                        await status_msg.edit(content="⚠️ Kling video generation timed out. Use the prompt manually on klingai.com")
                 else:
-                    await status_msg.edit(content="❌ *Could not register task with Kling API endpoint.*")
-            # ---------------------------------------------------------
-            
+                    await status_msg.edit(content="⚠️ Could not submit to Kling. Use the prompt manually on klingai.com")
+
             await asyncio.sleep(5)
         except Exception as e:
-            await channel.send(f"⚠️ Error processing {product.get('name', 'Product')}: {e}")
+            await channel.send(f"⚠️ Error: {e}")
 
 # ========================
 # START
